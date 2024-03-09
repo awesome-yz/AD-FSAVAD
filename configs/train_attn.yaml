@@ -1,14 +1,39 @@
 k_shots: 5
 num_tasks: 6
-
 img_channels: 3
 n_channels: 64
 n_groups: 32
 
 # Generator args
-g_channel_multipliers: [1, 2, 2, 4]
-g_is_attention: [False, False, False, True]
-beta_schedule: linear
+attention_dim: 64
+patch_dim: [4,4]
+heads: 8
+
+# Diffusion args
+diff_args:  
+  beta_schedule: linear
+
+# Transformer args
+transformer_args:
+  dim: 64 # embedding dimensions (total)
+  depth: 1 # number of layers
+  heads: 1
+  dropout: 0.0
+  mlp_dim: 64
+  dim_head: 1
+
+# Encoder args
+encoder_args:
+  ch: 64
+  ch_mult: [1,2,2,4]
+  out_ch: 3
+  in_channels: 3
+  num_res_blocks: 2
+  dropout: 0.0
+  attn_resolutions: []
+  resolution: 64 # attention resolution
+  z_channels: 3
+  double_z: False
 
 # Discriminator args
 d_n_classes: 1

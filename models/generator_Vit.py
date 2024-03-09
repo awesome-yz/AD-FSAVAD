@@ -8,6 +8,7 @@ import torch.nn.functional as F
 
 from .diffusion import Diffusion
 from .SimVP import SimVP
+from .vit import ViT
 
 
 class Swish(nn.Module):
@@ -365,7 +366,7 @@ class UNet(nn.Module):
         self.norm = nn.GroupNorm(8, n_channels)
         self.act = Swish()
         self.final = nn.Conv2d(in_channels, image_channels, kernel_size=(3, 3), padding=(1, 1))
-        self.pred_next = SimVP((3, 3, 256, 256))
+        self.pred_next = ViT(image_size=256, patch_size=16, num_classes=2, dim=1024, depth=6, heads=16, mlp_dim=2048, dropout=0.1)
 
     
     def forward(self, imgs: torch.Tensor):
@@ -379,6 +380,7 @@ class UNet(nn.Module):
          
         
         for i in range(3):
+            import pdb; pdb.set_trace()
             # Add noise to image
             x_t,t, noise = self.diffusion(imgs[i])
             q_samples = torch.cat((q_samples, x_t), dim=0)
@@ -414,7 +416,8 @@ class UNet(nn.Module):
             # Final normalization and convolution
             out = self.final(self.act(self.norm(x)))
             out_imgs = torch.cat((out_imgs, out), dim=0)
-        pred_imgs = self.pred_next(out_imgs[1:].unsqueeze(0)) # [B, T, C, H, W]
-        pred_imgs = pred_imgs.squeeze(0) # [T, C, H, W]
+        import pdb; pdb.set_trace()
+        pred_imgs = self.pred_next(out_imgs[1:]) # [B, T, C, H, W]
+        # pred_imgs = pred_imgs.squeeze(0) # [T, C, H, W]
     
         return pred_imgs, out_imgs, q_samples, noise_samples

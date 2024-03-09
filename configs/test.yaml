@@ -3,29 +3,26 @@ num_tasks: 6
 
 img_channels: 3
 n_channels: 64
-n_groups: 32
 
 # Generator args
 g_channel_multipliers: [1, 2, 2, 4]
 g_is_attention: [False, False, False, True]
-beta_schedule: linear
 
 # Discriminator args
 d_n_classes: 1
 d_resolution: 256
-d_lr: 0.0001
 
 # Training parameters
 adam_betas: [0.5, 0.999]
 gen_lr: 0.0001
+dis_lr: 0.0001
 weight_decay: 0.001
-step_size: 100
+step_size: 200
 
-total_epochs: 1000
-model_folder_path: ./model_weights/trial/
-train_frame_path: /impacs/yuz19/data/shanghaitech/training/frames_split
-test_frame_path: /impacs/yuz19/data/shanghaitech/testing/frames_split
+total_epochs: 200
+model_folder_path: ./model_weights/1000_5shot_psnr/
+frame_path: /impacs/yuz19/data/shanghaitech/testing/frames_split
 gt_folder: /impacs/yuz19/data/shanghaitech/testing/test_frame_mask
-images_folder: ./results/trial
-tensorboard_folder: ./logdir/trial
-
+test_images_folder: ./test_results/1000_5shot_psnr
+norm_frame_path: /impacs/yuz19/data/shanghaitech/testing/frames_normal
+test_graphs_folder: ./test_graphs/1000_5shot_psnr
