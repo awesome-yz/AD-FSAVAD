@@ -19,22 +19,20 @@ import torch.utils.data
 import torchvision.utils as vutils
 import torch.backends.cudnn as cudn
 from torch.nn import functional as F
-from unet_parts import *
 import imageio
 from torch.nn import BCELoss, MSELoss, L1Loss
 import ast
 import argparse
-import yaml
 from dataset import TestDataset
-from utils import createTestData, roll_axis, loss_function, create_folder, prep_data, test_write_images, torchPSNR, get_norm_frame
+from utils import *
 from models.discriminator import Discriminator
 from models.generator_SimVP import UNet as Generator
 import pytorch_msssim
 import math
-from accuracy import *
 import psutil
 from torch.nn import TripletMarginLoss as TML
 from pytorch_metric_learning.distances import CosineSimilarity
+from omegaconf import OmegaConf
 
 
 def wasserstein_loss(input):
@@ -46,8 +44,8 @@ def create_mask(image):
     mask = torch.argmax(out, dim=-1)
     return mask
 
-def Load_Dataloader(train_path_list, tf, batch_size):
-    data = TestDataset(train_path_list, tf)
+def Load_Dataloader(train_path_list, tf, batch_size, device):
+    data = TestDataset(train_path_list, device, tf)
     dataloader = DataLoader(data,batch_size=batch_size)
     return dataloader
 
@@ -75,46 +73,42 @@ def overall_discriminator_pass(discriminator, recon_batch, gt, valid, fake):
 
 
 def main(config):
-
     torch.manual_seed(1)
     # specify arguments
-    device = config['device']
-    k_shots = config['k_shots']
-    num_tasks = config['num_tasks']
-    adam_betas = tuple(config['adam_betas'])
-    gen_lr = config['gen_lr']
-    total_epochs = config['total_epochs']
-    model_folder_path = config['model_folder_path']
-    frame_path = config['frame_path']
-    step_size=config['step_size']
-    norm_frame_path = config['norm_frame_path']
-
+    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+    print(f'Device: {device}')
+    k_shots = config.k_shots
+    print(f'Kshot: {k_shots}')
+    num_tasks = config.num_tasks
+    adam_betas = tuple(config.adam_betas)
+    gen_lr = config.gen_lr
+    model_folder_path = config.model_folder_path
+    print(f'Model chkpts folder: {model_folder_path}')
+    frame_path = config.frame_path
+    print(f'Frames path: {frame_path}')
+  
     batch_size = 1
     generator = Generator(batch_size, config['img_channels'], config['n_channels'],
                           config['g_channel_multipliers'], config['g_is_attention']) 
     discriminator = Discriminator(n_classes=config['d_n_classes'], resolution=config['d_resolution'])
-    generator.cuda()
-    discriminator.cuda()
-
+    generator.to(device)
+    discriminator.to(device)
 
     tf = transforms.Compose([transforms.Resize((256,256)), transforms.ToTensor()])
 
-    generator.load_state_dict(torch.load(os.path.join(model_folder_path, "Generator_Final.pt")))
-    discriminator.load_state_dict(torch.load(os.path.join(model_folder_path, "Discriminator_Final.pt")))
+    generator.load_state_dict(torch.load(os.path.join(model_folder_path, "Generator_Final.pt"), map_location=device))
+    discriminator.load_state_dict(torch.load(os.path.join(model_folder_path, "Discriminator_Final.pt"), map_location=device))
 
     optimizer_g = optim.Adam(generator.parameters(), lr=gen_lr, betas=adam_betas)
     optimizer_d = optim.Adam(discriminator.parameters(), lr=gen_lr, betas=adam_betas)
 
     mse_loss = MSELoss()
     mae_loss = L1Loss()
-    triplet_loss = TML(margin=0.4)
-    # cosine_sim = CosineSimilarity()
     all_AUC = []
     avg_auc = 0
 
-
-    test_path_list = createTestData(frame_path, k_shots, config['gt_folder'], split=True)
-    test_dataloader = Load_Dataloader(test_path_list, tf, batch_size)
+    test_path_list = createTestData(frame_path, k_shots, config.gt_folder, split=True)
+    test_dataloader = Load_Dataloader(test_path_list, tf, batch_size, device)
 
     # creating graphs folder:
     if not os.path.exists(config['test_graphs_folder']):
@@ -126,7 +120,6 @@ def main(config):
     total_score_mae_psnr = []
     _,_, video_list = test_path_list
     video=0
-
     for vid_frames, vid_labels in test_dataloader:
             norm_frames = []
             labels = []
@@ -137,8 +130,7 @@ def main(config):
                     img = frame_sequence[0]
                     gt = frame_sequence[1]
 
-
-                    img, gt, valid, fake = prep_data(img, gt)
+                    img, gt, valid, fake = prep_data(img, gt, device)
                     norm_frames.append(gt)
                     labels.append(vid_labels[0][k_idx][0])
 
@@ -168,13 +160,12 @@ def main(config):
                     img = frame_sequence[0]
                     gt = frame_sequence[1]
 
-                    img, gt, _, _, = prep_data(img, gt)
+                    img, gt, _, _, = prep_data(img, gt, device)
                     pred_gt, _, _, _ = generator(img)
                     pred_gt = pred_gt[0].unsqueeze(0)
                     
                     dist_mse = mse_loss(pred_gt, gt)
                     dist_mae = mae_loss(pred_gt, gt)
-                    # msssim = ((1-pytorch_msssim.msssim(gt, pred_gt)))/2
                     psnr_test = torchPSNR(pred_gt, gt)
                     
 
@@ -183,7 +174,6 @@ def main(config):
                     psnr_set.append(psnr_test.detach().cpu().item())
                     real_gt.append(gt)
 
-                    # import pdb; pdb.set_trace()
                     # test_write_images(pred_gt, gt, config['test_images_folder'], t_idx, video)
 
                 for t_idx, lbl in enumerate(vid_labels[1]):
@@ -234,7 +224,6 @@ def main(config):
                 total_score_mse_psnr.append(vid_score_mse_psnr)
                 total_score_mae_psnr.append(vid_score_mae_psnr)
 
-    # import pdb; pdb.set_trace()
     print('Avg AUC_MSE: {}'.format(np.array(total_score_mse).mean()))
     print('Avg AUC_MAE: {}'.format(np.array(total_score_mae).mean()))
     print('Avg AUC_MSE_PSNR: {}'.format(np.array(total_score_mse_psnr).mean()))
@@ -246,5 +235,6 @@ if __name__ == "__main__":
     parser.add_argument('--config', type=str, help="path to config")
     args = parser.parse_args()
 
-    config = yaml.load(open(args.config, 'r'), Loader=yaml.FullLoader)
+    # config = yaml.load(open(args.config, 'r'), Loader=yaml.FullLoader)
+    config = OmegaConf.load(args.config)
     main(config)

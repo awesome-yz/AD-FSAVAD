@@ -57,28 +57,28 @@ def Load_Dataloader(path_list, tf, batch_size, device, test=False):
 
 
 def overall_generator_pass(generator, discriminator, img, gt, real):
-    recon_batch, model_out, noisy_imgs, noise = generator(img)
-    recon_batch = recon_batch[0].unsqueeze(0) # [1, 3, 256, 256]
-    msssim, f1, _ = loss_function(recon_batch, gt)
-    psnr =  (-1.0) * torchPSNR(recon_batch, gt)
-    # psnr = torchPSNR(recon_batch, gt)
+    recon_out, x_t, noise = generator(img)
+    # recon_out = recon_batch[0].unsqueeze(0) # [1, 3, 256, 256]
+    msssim, f1, _ = loss_function(recon_out, gt)
+    # psnr =  (-1.0) * torchPSNR(recon_out, gt)
+    psnr = torchPSNR(recon_out, gt)
     mse_loss = MSELoss()
     bce_loss = BCELoss()
 
-    l2_noise= mse_loss(model_out[1:], noise[1:])
+    l2_noise= mse_loss(x_t, noise)
     # loss = msssim + f1 + l2_noise + psnr
-    loss = f1 + l2_noise + msssim + psnr
-    dis_out = discriminator(recon_batch)
+    loss = f1 + l2_noise 
+    dis_out = discriminator(recon_out)
 
     g_loss = bce_loss(dis_out, real) 
     g_loss+= loss
-    return g_loss, recon_batch, loss, msssim, psnr
+    return g_loss, recon_out, loss, msssim, psnr
 
-def overall_discriminator_pass(discriminator, recon_batch, gt, real, fake):
+def overall_discriminator_pass(discriminator, recon_out, gt, real, fake):
     bce_loss = BCELoss()
 
     real_out = discriminator(gt)
-    fake_out = discriminator(recon_batch.detach())
+    fake_out = discriminator(recon_out.detach())
 
     real_loss = bce_loss(real_out, real)
     fake_loss = bce_loss(fake_out, fake)
@@ -115,16 +115,15 @@ def main(config):
     # specify arguments
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     print(f'Device: {device}')
-    k_shots = config['k_shots']
-    num_tasks = config['num_tasks']
-    adam_betas = tuple(config['adam_betas'])
-    gen_lr = config['gen_lr']
-    dis_lr = config['d_lr']
-    total_epochs = config['total_epochs']
-    model_folder_path = config['model_folder_path']
-    train_frame_path = config['train_frame_path']
-    step_size=config['step_size']
-    images_folder = config['images_folder']
+    k_shots = config.k_shots
+    num_tasks = config.num_tasks
+    adam_betas = tuple(config.adam_betas)
+    gen_lr = config.gen_lr
+    total_epochs = config.total_epochs
+    model_folder_path = config.model_folder_path
+    train_frame_path = config.train_frame_path
+    step_size=config.step_size
+    images_folder = config.images_folder
 
     print(f'kshots: {k_shots}')
     print(f'Data path: {train_frame_path}')
@@ -132,17 +131,18 @@ def main(config):
     print(f'Training epochs: {total_epochs}')
     print(f'Output Images: {images_folder}')
 
-    import pdb; pdb.set_trace()
-
-    # Initialize generator and discriminator
     batch_size = 1
-    generator = Generator(encoder_args=config.encoder_args, 
+    # Initialize generator and discriminator
+    generator = Generator(encoder_args=config.encoder_args,
+                          decoder_args=config.decoder_args, 
                           diff_args=config.diff_args, 
-                          transformer_args=config.transformer_args, 
+                          sp_attn_args=config.sp_attn_args,
+                          tp_attn_args = config.tp_attn_args, 
+                          n_ch = config.n_channels,
                           att_dim=config.attention_dim, 
                           patch_dim=config.patch_dim, 
                           heads=config.heads)
-    discriminator = Discriminator(n_classes=config['d_n_classes'], resolution=config['d_resolution'],D_lr=dis_lr)
+    discriminator = Discriminator(**config.discriminator_args)
     generator.to(device=device)
     discriminator.to(device=device)
 
@@ -262,8 +262,8 @@ def main(config):
                         # Store the loss
                         gen_validation_loss = g_loss
                         dis_validation_loss = d_loss
-                        gen_validation_loss.data = torch.FloatTensor([gen_validation_loss_store/k_shots]).cuda()
-                        dis_validation_loss.data = torch.FloatTensor([dis_validation_loss_store/k_shots]).cuda()
+                        gen_validation_loss.data = torch.FloatTensor([gen_validation_loss_store/k_shots]).to(device=device)
+                        dis_validation_loss.data = torch.FloatTensor([dis_validation_loss_store/k_shots]).to(device=device)
                     
                     print("Generator Validation Loss: ", g_loss.item())
                     print("Discriminator Validation Loss: ", d_loss.item())

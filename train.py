@@ -56,29 +56,31 @@ def Load_Dataloader(path_list, tf, batch_size, device, test=False):
     return dataloader
 
 
-def overall_generator_pass(generator, discriminator, img, gt, valid):
-    recon_batch, _, noisy_imgs, noise = generator(img)
+def overall_generator_pass(generator, discriminator, img, gt, real):
+    recon_batch, model_out, noisy_imgs, noise = generator(img)
     recon_batch = recon_batch[0].unsqueeze(0) # [1, 3, 256, 256]
     msssim, f1, _ = loss_function(recon_batch, gt)
     psnr =  (-1.0) * torchPSNR(recon_batch, gt)
+    # psnr = torchPSNR(recon_batch, gt)
     mse_loss = MSELoss()
     bce_loss = BCELoss()
 
-    l2_noise= mse_loss(noisy_imgs[1:], noise[1:])
-    loss = msssim + f1 + l2_noise + psnr
+    l2_noise= mse_loss(model_out[1:], noise[1:])
+    # loss = msssim + f1 + l2_noise + psnr
+    loss = f1 + l2_noise + msssim + psnr
     dis_out = discriminator(recon_batch)
 
-    g_loss = bce_loss(dis_out, valid) 
+    g_loss = bce_loss(dis_out, real) 
     g_loss+= loss
-    return g_loss, recon_batch, loss, msssim
+    return g_loss, recon_batch, loss, msssim, psnr
 
-def overall_discriminator_pass(discriminator, recon_batch, gt, valid, fake):
+def overall_discriminator_pass(discriminator, recon_batch, gt, real, fake):
     bce_loss = BCELoss()
 
     real_out = discriminator(gt)
     fake_out = discriminator(recon_batch.detach())
 
-    real_loss = bce_loss(real_out, valid)
+    real_loss = bce_loss(real_out, real)
     fake_loss = bce_loss(fake_out, fake)
     d_loss =  (real_loss + fake_loss)/2
     return d_loss
@@ -198,7 +200,7 @@ def main(config):
 
                     # Train Generator
                     inner_optimizer_G.zero_grad()
-                    g_loss, recon_batch, loss, msssim = overall_generator_pass(generator, discriminator, img, gt, valid)
+                    g_loss, recon_batch, loss, msssim, psnr = overall_generator_pass(generator, discriminator, img, gt, valid)
                     g_loss.backward()
                     inner_optimizer_G.step()
                     g_tr_loss.append(g_loss.item())
@@ -214,8 +216,8 @@ def main(config):
                     inner_optimizer_D.step()
                     d_tr_loss.append(d_loss.item())
 
-                    print ('Training: Epoch [{}/{}], Task [{}/{}], Reconstruction_Loss: {:.4f}, G_Loss: {:.4f}, D_loss: {:.4f}, msssim:{:.4f} '
-                           .format(epoch+1, total_epochs, tidx+1, num_tasks, loss.item(), g_loss, d_loss, msssim))
+                    print ('Training: Epoch [{}/{}], Task [{}/{}], Reconstruction_Loss: {:.4f}, G_Loss: {:.4f}, D_loss: {:.4f}, msssim:{:.4f}, psnr: {:.4f} '
+                           .format(epoch+1, total_epochs, tidx+1, num_tasks, loss.item(), g_loss, d_loss, msssim, psnr))
                     
                 #-------------------Meta-Validation -----------------------
                 print ('\n Meta Validation \n')
@@ -238,7 +240,7 @@ def main(config):
                
                     # k-Validation Generator
                     inner_optimizer_G.zero_grad()
-                    g_loss, recon_batch, loss, msssim = overall_generator_pass(generator, discriminator, img, gt, valid)
+                    g_loss, recon_batch, loss, msssim, psnr = overall_generator_pass(generator, discriminator, img, gt, valid)
                     g_vl_loss.append(g_loss.item())
                     
                     # k-Validation Discriminator
@@ -288,7 +290,7 @@ def main(config):
             img, gt, valid, fake = prep_data(img, gt, device)
 
             # Dummy Forward Pass
-            g_loss, recon_batch, loss, msssim = overall_generator_pass(generator, discriminator, img, gt, valid)
+            g_loss, recon_batch, loss, msssim, psnr = overall_generator_pass(generator, discriminator, img, gt, valid)
             d_loss = overall_discriminator_pass(discriminator, recon_batch, gt, valid, fake)
 
             # Unpack the list of grad dicts

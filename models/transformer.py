@@ -10,90 +10,107 @@ class TemporalAttention(nn.Module):
         super().__init__()
         inner_dim = dim_head * heads
         project_out = not(heads ==1 and dim_head ==dim)
-        self.b = 1
         self.heads = heads
         self.scale = dim_head ** -0.5
         self.norm = nn.LayerNorm(dim)
         self.attend = nn.Softmax(dim=-1)
         self.dropout = nn.Dropout(dropout)
-        self.to_qkv = nn.Linear(dim, inner_dim *3, bias=False)
+        self.to_qkv = nn.Conv3d(dim, inner_dim *3, kernel_size=(3,1,1), stride= 1, padding=0,bias=False)
         self.to_out = nn.Sequential(
-            nn.Linear(inner_dim, dim),
+            nn.Conv1d(inner_dim, dim, kernel_size=3, padding=1),
             nn.Dropout(dropout)
         )if project_out else nn.Identity()
 
     def forward(self, x):
-        import pdb; pdb.set_trace()
-        shape = x.shape
-        x = rearrange(x, '(b t) n d -> b (t n) d', b=self.b)
+        T, H, W, C = x.shape
         x = self.norm(x)
-        qkv = self.to_qkv(x).chunk(3, dim=-1)
-        q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> b h n d', h=self.heads), qkv)
-        q = q * self.scale
-        sim_qk = einsum('b h i d, b h j d -> b h i j', q, k)
-        attn = self.attend(sim_qk)
-        out = einsum('b h i j, b h j d -> b h i d', attn, v )
-        # dots = torch.matmul(q, k.transpose(-1, -2)) * self.scale
+        x = rearrange(x, '(B T) H W C -> B C T H W', B=1)
+        qkv = self.to_qkv(x).chunk(3, dim=1)
+        q, k, v = map(lambda t: rearrange(t, 'B (h C) ... -> B h C (...)', h=self.heads), qkv)
+        dots = torch.matmul(q, k.transpose(-1, -2)) * self.scale
+        attn = self.attend(dots)
+        attn = self.dropout(attn)
 
-        # attn = self.attend(dots)
-        # out = torch.matmul(attn, v)
-        out = rearrange(out, 'b h n d -> b n (h d)', h=self.heads)
+        out = torch.matmul(attn, v)
+        out = rearrange(out, 'B h C ... -> B (h C) ...')
         out = self.to_out(out)
-        return out.view(*shape)
+        return out.reshape(-1, C, H, W)
 
 
 
 class SpatialAttention(nn.Module):
-    def __init__(self, dim, heads, dropout, dim_head=64):
+    def __init__(self, dim, sp_dim, heads=1, dim_head=64, dropout=0.0):
         super().__init__()
+        inner_dim = dim_head * heads 
+        project_out = not(heads==1 and dim_head ==dim)
         self.heads = heads
-        inner_dim = dim_head * heads
-        project_out = not(heads ==1 and dim_head ==dim)
-        self.proj_dim = dim * 2
-        self.proj_conv = nn.Conv2d(dim, self.proj_dim, kernel_size=3, padding=3, stride=3)
-        self.norm = nn.BatchNorm2d(self.proj_dim)
+        self.scale = dim_head ** -0.5
+        self.norm = nn.LayerNorm(sp_dim)
+        self.to_qkv = nn.Conv2d(dim, inner_dim * 3, kernel_size=1, stride=1, padding=0, bias=False)
+        self.attend = nn.Softmax(dim=-1)
         self.dropout = nn.Dropout(dropout)
-        self.attend = nn.Softmax(dim = -1)
-        self.to_qkv = nn.Linear(self.proj_dim, inner_dim * 3, bias=False)
         self.to_out = nn.Sequential(
-            nn.Linear(inner_dim, self.proj_dim),
+            nn.Conv2d(inner_dim, dim),
             nn.Dropout(dropout)
-        ) if project_out else nn.Identity()
+        )if project_out else nn.Identity()
+        
 
     def forward(self, x):
-        shape = x.shape
-        x = self.norm(self.proj_conv(x))
-        qkv = self.to_qkv(x).chunk(3, dim=-1)
-        q, k, v = map(lambda t: rearrange(t, 'b n (h d), b h n d', h= self.heads), qkv)
-        dots =torch.matmul(q, k.transpose(-1, -2)) * self.scale
-        attn = self.attend(dots)
-        attn = self.dropout(attn)
-        out = torch.matmul(attn, v)
-        out = rearrange(out, 'b h n d -> b n (h d)')
-        out = self.to_out(out)
-        out = out.view(*shape)
+        b, c, ph, pw = x.shape # (batch, channels, height, width)
+        x = self.norm(x)
+        qkv = self.to_qkv(x).chunk(3, dim=1)
+
+        # position_wise attention branch
+        q, k, vp = map(lambda t: rearrange(t, 'b (h c) ph pw -> b h (ph pw) c', h=self.heads), qkv)
+        dots_position = torch.matmul(q, k.transpose(-1, -2)) * self.scale
+        attn_position = self.attend(dots_position)
+        attn_position = self.dropout(attn_position)
+        out_position = torch.matmul(attn_position, vp)
+        out_position = self.to_out(out_position)
+        out_position = rearrange(out_position, 'b h (ph pw) c -> b ph pw (h c)', ph=ph, pw=pw) 
+        
+        # channel_wise attention branch
+        q, k, vc = map(lambda t: rearrange(t, 'b (h c) ph pw -> b h c (ph pw)', h=self.heads), qkv)
+        dots_channel = torch.matmul(q, k.transpose(-1, -2)) * self.scale
+        attn_channel = self.attend(dots_channel)
+        attn_channel = self.dropout(attn_channel)
+        out_channel = torch.matmul(attn_channel, vc)
+        out_channel = self.to_out(out_channel)
+        out_channel = rearrange(out_channel, 'b h c (ph pw) -> b ph pw (h c)', ph=ph, pw=pw)
+
+        # adding both position_wise and channel_wise attention maps
+        out = out_position + out_channel
         return out
 
        
 class FeedForward(nn.Module):
-    def __init__(self,):
+    def __init__(self, dim, hidden_dim, dropout=0.0):
         super().__init__()
+        self.net = nn.Sequential(
+            nn.LayerNorm(dim),
+            nn.Linear(dim, hidden_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim, dim),
+            nn.Dropout(dropout)
+        )
+    
+    def forward(self, x):
+        import pdb; pdb.set_trace()
+        return self.net(x)
 
 class Transformer(nn.Module):
-    def __init__(self, dim, depth, heads, mlp_dim, dim_head, dropout=0.0):
+    def __init__(self, img_size, F_in, dim, depth, heads, mlp_dim, dim_head, dropout=0.0):
         super().__init__()
-        self.dim_head = dim_head
+        img_size = img_size
         self.norm = nn.LayerNorm(dim)
-        self.layers = nn.ModuleList([
-            TemporalAttention(dim, heads, self.dim_head, dropout),
-            SpatialAttention(dim, heads, self.dim_head, dropout),
-            
-            # FeedForward()
-        ])
+        self.transformer = nn.Sequential(
+            TemporalAttention(img_size, F_in, dim, heads, dim_head, dropout),
+            SpatialAttention(dim, heads, dim_head, dropout),
+            FeedForward(dim, mlp_dim, dropout=dropout)
+        )
 
     def forward(self, x):
-        for temp_attn, spact_attn, in self.layers:
-            x = temp_attn(x) + x
-            x = spact_attn(x) + x
+        x = self.transformer(x) + x
         return self.norm(x)
 
