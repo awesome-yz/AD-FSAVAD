@@ -367,30 +367,30 @@ class UNet(nn.Module):
         # Get time-step embeddings
         t = self.time_emb(t)
 
-        # # Get image projection
-        # x = self.image_proj(x)
+        # Get image projection
+        x = self.image_proj(x)
 
-        # # `h` will store outputs at each resolution for skip connection
-        # h = [x]
-        # # First half of U-Net
-        # for m in self.down:
-        #     x = m(x, t)
-        #     h.append(x)
+        # `h` will store outputs at each resolution for skip connection
+        h = [x]
+        # First half of U-Net
+        for m in self.down:
+            x = m(x, t)
+            h.append(x)
 
-        # # Middle (bottom)
-        # x = self.middle(x, t)
+        # Middle (bottom)
+        x = self.middle(x, t)
 
         # Second half of U-Net
         for m in self.up:
             x = m(x,t)
-            # if isinstance(m, Upsample):
-            #     x = m(x, t)
-            # else:
-            #     # Get the skip connection from first half of U-Net and concatenate
-            #     s = h.pop()
-            #     x = torch.cat((x, s), dim=1)
-            #     #
-            #     x = m(x, t)
+            if isinstance(m, Upsample):
+                x = m(x, t)
+            else:
+                # Get the skip connection from first half of U-Net and concatenate
+                s = h.pop()
+                x = torch.cat((x, s), dim=1)
+                #
+                x = m(x, t)
 
         # Final normalization and convolution
         out = self.final(self.act(self.norm(x)))

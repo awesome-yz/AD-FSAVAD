@@ -209,7 +209,7 @@ class Encoder(nn.Module):
     def __init__(self, *, ch, out_ch, ch_mult=(1,2,4,8), num_res_blocks, 
                  attn_resolutions, dropout=0.0, resamp_with_conv=True, in_channels, 
                  resolution, z_channels, double_z=True, use_linear_attn=False, attn_type='vanilla',
-                 **ignore_kwargs):
+                 ckpt_path=None, **ignore_kwargs):
         super().__init__()
         if use_linear_attn: attn_type='linear'  # type of attn, needs to be checked
         self.ch = ch # standard number of channels (inside network)
@@ -270,14 +270,6 @@ class Encoder(nn.Module):
                                         stride=1,
                                         padding=1)
         
-        # FC layer
-        self.flatten = nn.Flatten()
-        self.linear1 = nn.Linear(z_channels * 32 *32, 4096)
-        self.dropout = nn.Dropout(dropout)
-        self.linear2 = nn.Linear(4096, 4096)
-            
-        
-        # self.fc = torch.nn.Linear()
 
     def forward(self, x):
         # timestep embedding
@@ -306,12 +298,6 @@ class Encoder(nn.Module):
         h = nonlinearity(h)
         h = self.conv_out(h)
 
-        # #FC
-        # h = self.flatten(h)
-        # h = self.linear1(h)
-        # h = nonlinearity(h)
-        # h = self.dropout(h)
-        # h = self.linear2(h)
         return h
 
 
@@ -319,11 +305,15 @@ class Decoder(nn.Module):
     def __init__(self, *, ch, out_ch, ch_mult=(1,2,4,8), num_res_blocks,
                  attn_resolutions, dropout=0.0, resamp_with_conv=True, in_channels,
                  resolution, z_channels, give_pre_end=False, tanh_out=False, use_linear_attn=False,
-                 attn_type="vanilla", **ignorekwargs):
+                 use_timestep=False, attn_type="vanilla", **ignorekwargs):
         super().__init__()
         if use_linear_attn: attn_type = "linear"
         self.ch = ch
-        self.temb_ch = ch * 4
+        self.use_timestep = use_timestep
+        if self.use_timestep:
+            self.temb_ch = ch * 4
+        else:
+            self.temb_ch = 0
         self.num_resolutions = len(ch_mult)
         self.num_res_blocks = num_res_blocks
         self.resolution = resolution
@@ -393,7 +383,10 @@ class Decoder(nn.Module):
         self.last_z_shape = z.shape
 
         # timestep embedding
-        temb = get_timestep_embedding(t, self.temb_ch)
+        if self.use_timestep:
+            temb = get_timestep_embedding(t, self.temb_ch)
+        else:
+            temb = None
 
         # z to block_in
         h = self.conv_in(z)

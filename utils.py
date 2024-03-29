@@ -19,6 +19,9 @@ from PIL import Image
 import cv2 as cv
 from einops.layers.torch import Rearrange
 
+# 345678
+random_gen = np.random.default_rng(5678654)
+
 
 os.environ['CUDA_LAUNCH_BLOCKING']= "1"
 def generate_k_shot_frames(video_folder, k_shots):
@@ -52,8 +55,8 @@ def generate_test_frames(video_folder, k_shots, gt_folder, split=False):
         # get all normal frames
         indx = sorted([i for i,x in enumerate(frame_samples) if (gt_sequences[i]==0).all()])
         # randomize samples
-        np.random.seed(86)
-        indx = np.random.permutation(indx)
+        # np.random.seed(43)
+        indx = random_gen.permutation(indx)
         k_shot_ind = indx[:k_shots]
         q_ind = sorted([i for i,x in enumerate(frame_samples) if not i in k_shot_ind])
 
@@ -73,8 +76,6 @@ def generate_test_frames_ped(video_folder, k_shots, gt_folder, split=False):
     """
     Generating frames for testing
     """
-
-    
     all_frames = sorted([x for x in os.listdir(video_folder) if x.endswith('.jpg')])
     video_name = video_folder[-2:]
     all_gt = np.load(os.path.join(gt_folder, video_name+".npy"))
@@ -87,8 +88,8 @@ def generate_test_frames_ped(video_folder, k_shots, gt_folder, split=False):
         # get all normal frames
         indx = sorted([i for i,x in enumerate(frame_samples) if (gt_sequences[i]==0).all()])
         # randomize samples
-        np.random.seed(85)
-        indx = np.random.permutation(indx)
+        # np.random.seed(85)
+        indx = random_gen.permutation(indx)
 
         k_shot_ind = indx[:k_shots]
         q_ind = sorted([i for i,x in enumerate(frame_samples) if not i in k_shot_ind])

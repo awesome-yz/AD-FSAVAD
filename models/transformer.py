@@ -37,7 +37,6 @@ class TemporalAttention(nn.Module):
         return out.reshape(-1, C, H, W)
 
 
-
 class SpatialAttention(nn.Module):
     def __init__(self, dim, sp_dim, heads=1, dim_head=64, dropout=0.0):
         super().__init__()
@@ -87,30 +86,32 @@ class FeedForward(nn.Module):
     def __init__(self, dim, hidden_dim, dropout=0.0):
         super().__init__()
         self.net = nn.Sequential(
-            nn.LayerNorm(dim),
-            nn.Linear(dim, hidden_dim),
+            nn.BatchNorm2d(dim),
+            nn.Conv2d(dim, hidden_dim, kernel_size=3, padding=1),
             nn.GELU(),
             nn.Dropout(dropout),
-            nn.Linear(hidden_dim, dim),
+            nn.Conv2d(hidden_dim, dim, kernel_size=3, padding=1),
             nn.Dropout(dropout)
         )
     
     def forward(self, x):
-        import pdb; pdb.set_trace()
         return self.net(x)
 
 class Transformer(nn.Module):
-    def __init__(self, img_size, F_in, dim, depth, heads, mlp_dim, dim_head, dropout=0.0):
+    def __init__(self, transformer_args, sp_attn_args, tp_attn_args):
         super().__init__()
-        img_size = img_size
-        self.norm = nn.LayerNorm(dim)
+        import pdb; pdb.set_trace()
+        self.dim, self.mlp_dim, self.ff_dropout = transformer_args.values()
+        self.norm = nn.LayerNorm(self.dim)
         self.transformer = nn.Sequential(
-            TemporalAttention(img_size, F_in, dim, heads, dim_head, dropout),
-            SpatialAttention(dim, heads, dim_head, dropout),
-            FeedForward(dim, mlp_dim, dropout=dropout)
+            SpatialAttention(**sp_attn_args),
+            TemporalAttention(**tp_attn_args),
+            FeedForward(self.dim, self.mlp_dim, dropout=self.ff_dropout)
         )
 
     def forward(self, x):
+        import pdb; pdb.set_trace()
         x = self.transformer(x) + x
-        return self.norm(x)
+        x = self.norm(x)
+        return x
 

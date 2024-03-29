@@ -57,17 +57,20 @@ def Load_Dataloader(path_list, tf, batch_size, device, test=False):
 
 
 def overall_generator_pass(generator, discriminator, img, gt, real):
-    recon_out, x_t, noise = generator(img)
+    # recon_out, x_t, noise = generator(img)
+    recon_out = generator(img)
     # recon_out = recon_batch[0].unsqueeze(0) # [1, 3, 256, 256]
     msssim, f1, _ = loss_function(recon_out, gt)
-    # psnr =  (-1.0) * torchPSNR(recon_out, gt)
+    psnr_loss =  (-1.0) * torchPSNR(recon_out, gt)
     psnr = torchPSNR(recon_out, gt)
     mse_loss = MSELoss()
     bce_loss = BCELoss()
 
-    l2_noise= mse_loss(x_t, noise)
-    # loss = msssim + f1 + l2_noise + psnr
-    loss = f1 + l2_noise 
+    # l2_noise= mse_loss(x_t, noise)
+    # loss = msssim + f1 + l2_noise + psnr_loss
+    # loss = f1 + l2_noise 
+    # loss = msssim + f1 + psnr_loss
+    loss = f1
     dis_out = discriminator(recon_out)
 
     g_loss = bce_loss(dis_out, real) 
@@ -137,11 +140,9 @@ def main(config):
                           decoder_args=config.decoder_args, 
                           diff_args=config.diff_args, 
                           sp_attn_args=config.sp_attn_args,
-                          tp_attn_args = config.tp_attn_args, 
-                          n_ch = config.n_channels,
-                          att_dim=config.attention_dim, 
-                          patch_dim=config.patch_dim, 
-                          heads=config.heads)
+                          tp_attn_args = config.tp_attn_args,
+                          ff_args= config.ff_args
+                          )
     discriminator = Discriminator(**config.discriminator_args)
     generator.to(device=device)
     discriminator.to(device=device)
@@ -175,6 +176,7 @@ def main(config):
     d_vl_loss = []
 
 
+    import pdb; pdb.set_trace()
     for epoch in range(total_epochs):
         train_path_list = createEpochData(train_frame_path, num_tasks, k_shots)
         train_dataloader = Load_Dataloader(train_path_list, tf, batch_size, device=device)
