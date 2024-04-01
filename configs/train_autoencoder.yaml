@@ -22,51 +22,24 @@ diff_args:
 # Transformer args
 ff_args:
   dim: 6 # embedding dimensions (total)
-  hidden_dim: 12 # 6 * 2
+  hidden_dim: 12 # 64 * 2
   dropout: 0.0
+  out_dim: 3
 
 # Spatial Attention args
 sp_attn_args:
-  dim: 64
+  dim: 6
   heads: 1
   dropout: 0.0
   sp_dim: [32, 32]
-  dim_head: 64
+  dim_head: 32
 
 # Temporal Attention args
 tp_attn_args:
-  dim: 64
+  dim: 6
   heads: 1
   dropout: 0.0
-  dim_head: 64
-
-# Encoder args
-encoder_args:
-  ch: 64
-  ch_mult: [1,2,2,4]
-  out_ch: 3
-  in_channels: 3
-  num_res_blocks: 2
-  dropout: 0.0
-  attn_resolutions: []
-  resolution: 64 # attention resolution
-  z_channels: 64
-  double_z: False
-
-# Decoder args
-decoder_args:
-  ch: 64
-  ch_mult: [1,2,2,4]
-  out_ch: 3
-  in_channels: 3
-  num_res_blocks: 2
-  dropout: 0.0
-  # 8, 16, 32, 64
-  attn_resolutions: []
-  resolution: 64 # attention resolution
-  z_channels: 64
-  double_z: False
-  use_timestep: False
+  dim_head: 32
 
 
 # Discriminator args
@@ -77,10 +50,47 @@ discriminator_args:
 
 # Training parameters
 adam_betas: [0.5, 0.999]
-gen_lr: 0.0001
-weight_decay: 0.001
+gen_lr: 4.5e-06
+weight_decay: 0.01
 step_size: 100
 
+
+# autoencoder_args:
+#   embed_dim: 3
+#   monitor: "val/rec_loss"
+#   ckpt_path: "./ckpts/kl-f4/model.ckpt"
+#   ignore_keys: ["quant_conv", "loss"]
+#   ddconfig:
+#     double_z: True
+#     z_channels: 3
+#     resolution: 256
+#     in_channels: 3
+#     out_ch: 3
+#     ch: 128
+#     ch_mult: [ 1,2,4,4 ]  # num_down = len(ch_mult)-1
+#     num_res_blocks: 2
+#     attn_resolutions: [ ]
+#     dropout: 0.0
+#   lossconfig:
+#     target: taming.modules.losses.DummyLoss
+  # lossconfig:
+  #   target: ldm.losses.LPIPSWithDiscriminator
+  #   params:
+  #     disc_start: 50001
+  #     kl_weight: 0.000001
+  #     disc_weight: 0.5
+ckpt_path: "./ckpts/vq-f4/model.ckpt" 
+encoder_decoder_args:
+    double_z: True
+    z_channels: 3
+    resolution: 256
+    in_channels: 3
+    out_ch: 3
+    ch: 128
+    ch_mult: [ 1,2,4,4 ]  # num_down = len(ch_mult)-1
+    num_res_blocks: 2
+    attn_resolutions: [ ]
+    dropout: 0.0
 total_epochs: 2000
 model_folder_path: ./model_weights/trial_2/
 train_frame_path: /impacs/yuz19/data/shanghaitech/training/frames_split

@@ -24,7 +24,7 @@ import ast
 import argparse
 import yaml
 from dataset import TrainDataset
-from utils import createEpochData, loss_function, create_folder, prep_data, torchPSNR, write_images
+from utils import createEpochData, loss_function, create_folder, prep_data, torchPSNR, write_images, get_params_true
 from models.discriminator import Discriminator
 from models.generator import Generator
 import os
@@ -136,12 +136,11 @@ def main(config):
 
     batch_size = 1
     # Initialize generator and discriminator
-    generator = Generator(encoder_args=config.encoder_args,
-                          decoder_args=config.decoder_args, 
-                          diff_args=config.diff_args, 
+    generator = Generator(encoder_decoder_args=config.encoder_decoder_args,
                           sp_attn_args=config.sp_attn_args,
                           tp_attn_args = config.tp_attn_args,
-                          ff_args= config.ff_args
+                          ff_args= config.ff_args,
+                        #   chkpt_path=config.ckpt_path
                           )
     discriminator = Discriminator(**config.discriminator_args)
     generator.to(device=device)

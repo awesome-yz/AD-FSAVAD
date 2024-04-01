@@ -4,6 +4,9 @@ import torch
 import pytorch_msssim
 import numpy as np
 from math import log10
+import math
+import numpy as np
+from sklearn.metrics import roc_auc_score
 from torch.nn import functional as F
 from torch.cuda import FloatTensor as Tensor
 from torch.autograd import Variable
@@ -332,11 +335,7 @@ def check_dir(path):
         os.makedirs(path)
 
 
-import torch
-import torch.nn as nn
-import math
-import numpy as np
-from sklearn.metrics import roc_auc_score
+
 
 def psnr(mse):
     # mse = mse.detach().cpu().numpy()
@@ -468,3 +467,11 @@ def patch_embedding(patch_height, patch_width, dim, channels=3):
         nn.Linear(patch_dim, dim), # projection to dim
         nn.LayerNorm(dim)
     )
+
+def get_params_true(model):
+    import pdb; pdb.set_trace()
+    params_list = nn.ParameterList()
+    for name, param in model.named_parameters():
+        if param.requires_grad == True:
+            params_list.append(param)
+    return params_list

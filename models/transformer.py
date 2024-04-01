@@ -12,7 +12,7 @@ class TemporalAttention(nn.Module):
         project_out = not(heads ==1 and dim_head ==dim)
         self.heads = heads
         self.scale = dim_head ** -0.5
-        self.norm = nn.LayerNorm(dim)
+        self.norm = nn.BatchNorm2d(dim)
         self.attend = nn.Softmax(dim=-1)
         self.dropout = nn.Dropout(dropout)
         self.to_qkv = nn.Conv3d(dim, inner_dim *3, kernel_size=(3,1,1), stride= 1, padding=0,bias=False)
@@ -22,9 +22,9 @@ class TemporalAttention(nn.Module):
         )if project_out else nn.Identity()
 
     def forward(self, x):
-        T, H, W, C = x.shape
+        T, C, H, W = x.shape
         x = self.norm(x)
-        x = rearrange(x, '(B T) H W C -> B C T H W', B=1)
+        x = rearrange(x, '(B T) C H W  -> B C T H W', B=1)
         qkv = self.to_qkv(x).chunk(3, dim=1)
         q, k, v = map(lambda t: rearrange(t, 'B (h C) ... -> B h C (...)', h=self.heads), qkv)
         dots = torch.matmul(q, k.transpose(-1, -2)) * self.scale
@@ -49,7 +49,7 @@ class SpatialAttention(nn.Module):
         self.attend = nn.Softmax(dim=-1)
         self.dropout = nn.Dropout(dropout)
         self.to_out = nn.Sequential(
-            nn.Conv2d(inner_dim, dim),
+            nn.Conv2d(inner_dim, dim, kernel_size=3, padding=1),
             nn.Dropout(dropout)
         )if project_out else nn.Identity()
         
@@ -65,8 +65,9 @@ class SpatialAttention(nn.Module):
         attn_position = self.attend(dots_position)
         attn_position = self.dropout(attn_position)
         out_position = torch.matmul(attn_position, vp)
-        out_position = self.to_out(out_position)
         out_position = rearrange(out_position, 'b h (ph pw) c -> b ph pw (h c)', ph=ph, pw=pw) 
+        out_position = self.to_out(out_position)
+        
         
         # channel_wise attention branch
         q, k, vc = map(lambda t: rearrange(t, 'b (h c) ph pw -> b h c (ph pw)', h=self.heads), qkv)
@@ -74,8 +75,9 @@ class SpatialAttention(nn.Module):
         attn_channel = self.attend(dots_channel)
         attn_channel = self.dropout(attn_channel)
         out_channel = torch.matmul(attn_channel, vc)
-        out_channel = self.to_out(out_channel)
         out_channel = rearrange(out_channel, 'b h c (ph pw) -> b ph pw (h c)', ph=ph, pw=pw)
+        out_channel = self.to_out(out_channel)
+        
 
         # adding both position_wise and channel_wise attention maps
         out = out_position + out_channel
@@ -83,14 +85,14 @@ class SpatialAttention(nn.Module):
 
        
 class FeedForward(nn.Module):
-    def __init__(self, dim, hidden_dim, dropout=0.0):
+    def __init__(self, dim, out_dim, hidden_dim, dropout=0.0):
         super().__init__()
         self.net = nn.Sequential(
             nn.BatchNorm2d(dim),
             nn.Conv2d(dim, hidden_dim, kernel_size=3, padding=1),
             nn.GELU(),
             nn.Dropout(dropout),
-            nn.Conv2d(hidden_dim, dim, kernel_size=3, padding=1),
+            nn.Conv2d(hidden_dim, out_dim, kernel_size=3, padding=1),
             nn.Dropout(dropout)
         )
     
