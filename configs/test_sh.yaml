@@ -20,9 +20,9 @@ weight_decay: 0.001
 step_size: 200
 
 total_epochs: 200
-model_folder_path: /scratch/a.yuz19/DGAN/model_weights/1000_5shot_psnr/
-frame_path: /scratch/a.yuz19/Data/shanghaitech/testing/frames_split
-gt_folder: /scratch/a.yuz19/Data/shanghaitech/testing/test_frame_mask
-test_images_folder: /scratch/a.yuz19/DGAN/test_results/4000_5shot_psnr
-norm_frame_path: /scratch/a.yuz19/Data/shanghaitech/testing/frames_normal
-test_graphs_folder: /scratch/a.yuz19/DGAN/test_graphs/4000_5shot_psnr
+model_folder_path: 
+frame_path: 
+gt_folder: 
+test_images_folder: 
+norm_frame_path: 
+test_graphs_folder:
