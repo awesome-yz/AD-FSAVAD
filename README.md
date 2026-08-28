@@ -9,3 +9,28 @@ Our framework introduces a novel pipeline that integrates a **Denoising Diffusio
   <img src="images/architecture.png" alt="System Architecture" width="700">
 </p>
 
+---
+## Datasets:
+ShanghaiTech: https://svip-lab.github.io/dataset/campus_dataset.html
+CUHK Avenue: https://www.cse.cuhk.edu.hk/leojia/projects/detectabnormal/dataset.html
+UCSD Ped1&2: http://www.svcl.ucsd.edu/projects/anomaly/dataset.htm
+
+---
+## Acknowledgments
+This repository adapts and builds upon code from the following projects:
+* [Few-shot-Scene-adaptive-Anomaly-Detection] (https://github.com/yiweilu3/Few-shot-Scene-adaptive-Anomaly-Detection.git)
+---
+## Citation
+If you find this repository useful, please cite our paper:
+
+```bibtex
+@article{yuz2024adversarial,
+  title={Adversarial diffusion for few-shot scene-adaptive video anomaly detection},
+  journal={Neurocomputing},
+  volume={567},
+  pages={115674},
+  year={2024},
+  publisher={Elsevier},
+  doi={10.1016/j.neucom.2024.115674}
+}
+```

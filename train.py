@@ -62,12 +62,10 @@ def overall_generator_pass(generator, discriminator, img, gt, real):
     recon_batch = recon_batch[0].unsqueeze(0) # [1, 3, 256, 256]
     msssim, f1, _ = loss_function(recon_batch, gt)
     psnr =  (-1.0) * torchPSNR(recon_batch, gt)
-    # psnr = torchPSNR(recon_batch, gt)
     mse_loss = MSELoss()
     bce_loss = BCELoss()
 
     l2_noise= mse_loss(model_out[1:], noise[1:])
-    # loss = msssim + f1 + l2_noise + psnr
     loss = f1 + l2_noise + msssim + psnr
     dis_out = discriminator(recon_batch)
 
