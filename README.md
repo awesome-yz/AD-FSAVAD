@@ -10,13 +10,38 @@ Our framework introduces a novel pipeline that integrates a **Denoising Diffusio
 </p>
 
 ---
-## Datasets:
+## 1. Data Preparation:
+
+Download dataset and update **train.yaml** config file:
+
+train_frame_path: [provide path to folder containing training frames]
+
+test_frame_path: [provide path to folder containing testing frames]
+
+gt_folder: [provide path to folder containg grountruth masks]
+
+### Datasets:
 ShanghaiTech: https://svip-lab.github.io/dataset/campus_dataset.html
 
 CUHK Avenue: https://www.cse.cuhk.edu.hk/leojia/projects/detectabnormal/dataset.html
 
 UCSD Ped1&2: http://www.svcl.ucsd.edu/projects/anomaly/dataset.htm
 
+
+## 2. Training
+
+Update options and provide paths of the datasets in the config files (train.yaml) and run:
+
+```
+python train.py --config ./configs/train.yaml
+```
+
+## 3. Evaluation
+Update **test.yaml** config file and run:
+
+```
+python test.py --config ./configs/test.yaml
+```
 ---
 ## Acknowledgments
 This repository adapts and builds upon code from the following projects:
