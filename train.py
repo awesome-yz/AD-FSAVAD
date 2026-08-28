@@ -33,6 +33,7 @@ from copy import deepcopy
 import imageio
 from torch.utils.tensorboard import SummaryWriter 
 from omegaconf import OmegaConf
+import time
 
 os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
@@ -168,12 +169,17 @@ def main(config):
     d_tr_loss = []
     d_vl_loss = []
 
+    # Time tacking
+    epoch_times = []
+    task_times = []
 
+    train_start_time = time.perf_counter()
     for epoch in range(total_epochs):
         train_path_list = createEpochData(train_frame_path, num_tasks, k_shots)
         train_dataloader = Load_Dataloader(train_path_list, tf, batch_size, device=device)
 
         for _, epoch_of_tasks in enumerate(train_dataloader):
+            epoch_start_time = time.perf_counter()
             gen_epoch_grads = []
             dis_epoch_grads = []
 
@@ -181,6 +187,9 @@ def main(config):
             # ------------------------------Meta-Training--------------------
             for tidx, task in enumerate(epoch_of_tasks):
                 print ('\n Meta Training \n')
+                task_start_time = time.perf_counter()
+                
+
                 generator.load_state_dict(torch.load(previous_generator))
                 discriminator.load_state_dict(torch.load(previous_discriminator))
 
@@ -206,8 +215,9 @@ def main(config):
                     g_tr_loss.append(g_loss.item())
 
                     # Save generated images
-                    create_folder(config['images_folder'])
-                    write_images(recon_batch, gt, config['images_folder'], tidx+1, epoch)
+                    if config.save_images:
+                        create_folder(config['images_folder'])
+                        write_images(recon_batch, gt, config['images_folder'], tidx+1, epoch)
 
                     # Train Discriminator
                     inner_optimizer_D.zero_grad()
@@ -218,6 +228,7 @@ def main(config):
 
                     print ('Training: Epoch [{}/{}], Task [{}/{}], Reconstruction_Loss: {:.4f}, G_Loss: {:.4f}, D_loss: {:.4f}, msssim:{:.4f}, psnr: {:.4f} '
                            .format(epoch+1, total_epochs, tidx+1, num_tasks, loss.item(), g_loss, d_loss, msssim, psnr))
+                   
                     
                 #-------------------Meta-Validation -----------------------
                 print ('\n Meta Validation \n')
@@ -274,6 +285,9 @@ def main(config):
                 gen_epoch_grads.append(gen_meta_grads)
                 dis_epoch_grads.append(dis_meta_grads)
 
+                print("Task completion: ", time.perf_counter() - task_start_time)
+                task_times.append(time.perf_counter() - task_start_time)
+
             # inner_scheduler step
             inner_scheduler_G.step()
             inner_scheduler_D.step()
@@ -306,6 +320,8 @@ def main(config):
             # Save the Model
             torch.save(generator.state_dict(), previous_generator)
             torch.save(discriminator.state_dict(), previous_discriminator)
+            print("Epoch time: ", time.perf_counter() - epoch_start_time)
+            epoch_times.append(time.perf_counter() - epoch_start_time)
             if (epoch % 50 == 0):
                 writer.add_scalar('Generator Training Loss', torch.FloatTensor(g_tr_loss).sum()/ (k_shots * num_tasks * epoch), epoch)
                 writer.add_scalar('Discriminator Training Loss', torch.FloatTensor(d_tr_loss).sum()/ (k_shots * num_tasks * epoch), epoch)
@@ -319,6 +335,9 @@ def main(config):
 
 
     print("Training Complete")
+    print("Total training time: ", time.perf_counter() - train_start_time)
+    print("Average time per epoch: ", (epoch_times.sum())/total_epochs)
+    print("Average time per episode: ", (task_times.sum())/(total_epochs * num_tasks))
     # Save final model 
     gen_path = os.path.join(model_folder_path, str.format("Generator_Final.pt"))
     dis_path = os.path.join(model_folder_path, str.format("Discriminator_Final.pt"))

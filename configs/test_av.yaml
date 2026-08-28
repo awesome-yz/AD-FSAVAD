@@ -1,0 +1,28 @@
+k_shots: 5
+num_tasks: 6
+
+img_channels: 3
+n_channels: 64
+
+# Generator args
+g_channel_multipliers: [1, 2, 2, 4]
+g_is_attention: [False, False, False, True]
+
+# Discriminator args
+d_n_classes: 1
+d_resolution: 256
+
+# Training parameters
+adam_betas: [0.5, 0.999]
+gen_lr: 0.0001
+dis_lr: 0.0001
+weight_decay: 0.001
+step_size: 200
+
+total_epochs: 200
+model_folder_path: /scratch/a.yuz19/DGAN/model_weights/1000_5shot_psnr/
+frame_path: /scratch/a.yuz19/Data/Avenue_dataset/testing_videos/frames/
+gt_folder: /scratch/a.yuz19/Data/Avenue_dataset/gt_test/
+test_images_folder: /scratch/a.yuz19/DGAN/test_results/1000_5shot_psnr
+norm_frame_path: /scratch/a.yuz19/Data/Avenue_dataset/testing_videos/frames
+test_graphs_folder: /scratch/a.yuz19/DGAN/test_graphs/1000_5shot_psnr

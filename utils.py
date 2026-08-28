@@ -79,6 +79,7 @@ def generate_test_frames_ped(video_folder, k_shots, gt_folder, split=False):
     """
     Generating frames for testing
     """
+
     all_frames = sorted([x for x in os.listdir(video_folder) if x.endswith('.jpg')])
     video_name = video_folder[-2:]
     all_gt = np.load(os.path.join(gt_folder, video_name+".npy"))

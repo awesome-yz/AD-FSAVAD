@@ -31,9 +31,8 @@ import pytorch_msssim
 import math
 import psutil
 from torch.nn import TripletMarginLoss as TML
-from pytorch_metric_learning.distances import CosineSimilarity
 from omegaconf import OmegaConf
-
+import time
 
 def wasserstein_loss(input):
     return torch.mean(input)
@@ -120,10 +119,15 @@ def main(config):
     total_score_mae_psnr = []
     _,_, video_list = test_path_list
     video=0
+    video_test_times = []
+    video_fine_tune_times = []
+
+    train_start_time = time.perf_counter()
     for vid_frames, vid_labels in test_dataloader:
             norm_frames = []
             labels = []
             video += 1
+            video_start_time = time.perf_counter()
             for k_idx, frame_sequence in enumerate(vid_frames[0]):
                 print("video:k_shot {}:{} finetuning".format(video, k_idx+1))
                 if len(frame_sequence[0])==3:
@@ -146,12 +150,16 @@ def main(config):
                     d_loss.backward()
                     optimizer_d.step()
             
+            video_fine_tune_time = time.perf_counter() - video_start_time
+            video_fine_tune_times.append(video_fine_tune_time)
+            print("video: {} Finetuning time: ".format(video), video_fine_tune_time)
             ## Testing
             real_gt = []
             gt_label = []
             dist_mse_set = []
             dist_mae_set = []
             psnr_set = []
+            
 
             with torch.no_grad():
                 print("video: {} Testing".format(video))
@@ -199,6 +207,11 @@ def main(config):
                     anomaly_score_mse.append(0)
                     anomaly_score_mae.append(0)
 
+                # time for each video:
+                print("Video {} testing time: ".format(video), time.perf_counter() - video_start_time)
+                video_test_times.append(time.perf_counter() - video_start_time)
+               
+                # creating folder for each video:
                 if not os.path.exists(os.path.join(config['test_graphs_folder'], str(video))):
                     create_folder(os.path.join(config['test_graphs_folder'], str(video)))
                 
@@ -224,6 +237,11 @@ def main(config):
                 total_score_mse_psnr.append(vid_score_mse_psnr)
                 total_score_mae_psnr.append(vid_score_mae_psnr)
 
+    print('Total testing time: ', time.perf_counter() - train_start_time)
+    print('Average testing time per video: ', np.array(video_test_times).mean())
+    print('Average finetuning time per video: ', np.array(video_fine_tune_times).mean())
+   
+    # average AUC across videos
     print('Avg AUC_MSE: {}'.format(np.array(total_score_mse).mean()))
     print('Avg AUC_MAE: {}'.format(np.array(total_score_mae).mean()))
     print('Avg AUC_MSE_PSNR: {}'.format(np.array(total_score_mse_psnr).mean()))
