@@ -22,12 +22,12 @@ weight_decay: 0.001
 step_size: 100
 
 total_epochs: 1000
-model_folder_path: /scratch/a.yuz19/DGAN/model_weights/1000_5shot_psnr/
-train_frame_path: /scratch/a.yuz19/Data/shanghaitech/training/frames_split
-test_frame_path: /scratch/a.yuz19/Data/shanghaitech/testing/frames_split
-gt_folder: /scratch/a.yuz19/Data/shanghaitech/testing/test_frame_mask
-images_folder: /scratch/a.yuz19/DGAN/results/1000_5shot_psnr
-tensorboard_folder: /scratch/a.yuz19/DGAN/logdir/1000_5shot_psnr
+model_folder_path: 
+train_frame_path:
+test_frame_path: 
+gt_folder: 
+images_folder: 
+tensorboard_folder: 
 
 # training options
 save_images: False
