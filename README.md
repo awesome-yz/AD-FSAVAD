@@ -12,7 +12,9 @@ Our framework introduces a novel pipeline that integrates a **Denoising Diffusio
 ---
 ## Datasets:
 ShanghaiTech: https://svip-lab.github.io/dataset/campus_dataset.html
+
 CUHK Avenue: https://www.cse.cuhk.edu.hk/leojia/projects/detectabnormal/dataset.html
+
 UCSD Ped1&2: http://www.svcl.ucsd.edu/projects/anomaly/dataset.htm
 
 ---
